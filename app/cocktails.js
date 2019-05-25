@@ -24,12 +24,12 @@ const upload = multer({storage});
 const router = express.Router();
 
 router.get('/', tryAuth, (req, res) => {
-    let criteria = {published: true};
+    let criteria = {isPublished: true};
 
     if (req.user && req.user.role !== 'admin') {
         criteria = {
             $or: [
-                {published: true},
+                {isPublished: true},
                 {user: req.user._id}
             ]
         }
