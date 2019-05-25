@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const nanoid = require('nanoid');
 const config = require('../config');
-const auth = require('../middleware/auth');
+const tryAuth = require('../middleware/tryAuth');
 const permit = require('../middleware/permit');
 
 const Cocktail = require('../models/Cocktail');
@@ -23,13 +23,19 @@ const upload = multer({storage});
 
 const router = express.Router();
 
-router.get('/', (req, res) => {
-    console.log('geet')
-    // if (req.query.user)
-    //     return Cocktail.find({user: new ObjectId(req.query.user)})
-    //         .then(cocktails => res.send(cocktails))
-    //         .catch(() => res.sendStatus(500))
-    Cocktail.find()
+router.get('/', tryAuth, (req, res) => {
+    let criteria = {published: true};
+
+    if (req.user && req.user.role !== 'admin') {
+        criteria = {
+            $or: [
+                {published: true},
+                {user: req.user._id}
+            ]
+        }
+    }
+
+    Cocktail.find(criteria)
         .then(cocktails => res.send(cocktails))
         .catch(() => res.sendStatus(500))
 });
@@ -43,22 +49,22 @@ router.get('/:id', (req, res) => {
         .catch(()=>res.sendStatus(500))
 });
 
-router.post('/', auth, upload.single('image'), (req, res) => {
+router.post('/', tryAuth, upload.single('image'), (req, res) => {
     const cocktailData = {
         title: req.body.title,
         receipt: req.body.receipt,
         user: req.user,
 
     };
-    console.log(req.body.ingredients)
-    console.log(JSON.parse(req.body.ingredients))
 
     if(req.body.ingredients) {
         cocktailData.ingredients = JSON.parse(req.body.ingredients)
     }
+
     if (req.file) {
         cocktailData.image = req.file.filename;
     }
+
     const cocktail = new Cocktail(cocktailData);
     cocktail.save()
         .then(result => res.send(result))
@@ -68,7 +74,7 @@ router.post('/', auth, upload.single('image'), (req, res) => {
         })
 });
 
-router.delete('/:id', [auth, permit('admin')], (req, res) => {
+router.delete('/:id', [tryAuth, permit('admin')], (req, res) => {
     Cocktail.findById(req.params.id)
         .then(cocktail => {
             cocktail.delete();
@@ -77,7 +83,7 @@ router.delete('/:id', [auth, permit('admin')], (req, res) => {
         .catch(()=>res.sendStatus(500))
 });
 
-router.post('/:id/publish', [auth, permit('admin')], (req, res) => {
+router.post('/:id/publish', [tryAuth, permit('admin')], (req, res) => {
     Cocktail.findById(req.params.id)
         .then(cocktail => {
             cocktail.published = true;
